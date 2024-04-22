@@ -2,30 +2,56 @@ import open3d as o3d
 import numpy as np
 import copy
 
-pcd = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
-# Mostrar nube
+def keypoints_to_spheres(keypoints, radius= 0.001):
+    spheres = o3d.geometry.TriangleMesh()
 
-plane_model, inliers = pcd.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
-inlier_cloud = pcd.select_by_index(inliers)
-inlier_cloud.paint_uniform_color([1.0, 0, 0])
-outlier_cloud = pcd.select_by_index(inliers, invert=True)
+    for keypoint in keypoints.points:
+        sphere = o3d.geometry.TriangleMesh.create_sphere(radius=radius)
+        sphere.translate(keypoint)
+        spheres += sphere
 
-plane_model, inliers2 = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
-inlier_cloud2 = outlier_cloud.select_by_index(inliers2)
-inlier_cloud2.paint_uniform_color([1.0, 0, 0])
-outlier_cloud2 = outlier_cloud.select_by_index(inliers2, invert=True)
+    spheres.paint_uniform_color([1, 0, 0.75])
 
-plane_model, inliers3 = outlier_cloud2.segment_plane(distance_threshold = 0.005, ransac_n  = 3, num_iterations = 1000)
-inlier_cloud3 = outlier_cloud2.select_by_index(inliers3)
-inlier_cloud3.paint_uniform_color([1.0, 0, 0])
-outlier_cloud3 = outlier_cloud2.select_by_index(inliers3, invert=True)
+    return spheres
 
-outlier_cloud3_sub = outlier_cloud3.voxel_down_sample(0.005) # Tamaño de la hoja de 0.1
+def extraer_keypoints():
 
-o3d.visualization.draw_geometries([outlier_cloud3_sub])
+    pcd = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
+    pcd_sub = pcd.voxel_down_sample(0.005) # Tamaño de la hoja de 0.1
 
-pcd = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
+    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd_sub, salient_radius= 0.015, non_max_radius = 0.01, gamma_21= 0.99, gamma_32= 0.99)
 
-pcd_sub = pcd.voxel_down_sample(0.005) # Tamaño de la hoja de 0.1
+    spheres = keypoints_to_spheres(keypoints)
 
-o3d.visualization.draw_geometries([pcd_sub])
+    o3d.visualization.draw_geometries([pcd_sub, spheres])
+
+
+def main():
+    pcd = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
+    # Mostrar nube
+    #o3d.visualization.draw_geometries([pcd])
+
+    plane_model, inliers = pcd.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
+    outlier_cloud = pcd.select_by_index(inliers, invert=True)
+
+    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
+    outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
+
+    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.005, ransac_n  = 3, num_iterations = 1000)
+    outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)
+
+    outlier_cloud_sub = outlier_cloud.voxel_down_sample(0.005) # Tamaño de la hoja de 0.1
+
+    #o3d.visualization.draw_geometries([outlier_cloud_sub])
+
+    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(outlier_cloud_sub, salient_radius= 0.015, non_max_radius = 0.01, gamma_21= 0.99, gamma_32= 0.99)
+
+    spheres = keypoints_to_spheres(keypoints, radius=0.002)
+
+    o3d.visualization.draw_geometries([outlier_cloud_sub, spheres])
+
+    pcd = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
+
+
+if __name__ == "__main__":
+    main()
