@@ -29,7 +29,7 @@ def fpfh(pcd):
 
 def extraer_keypoints(pcd):
 
-    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.015, non_max_radius = 0.01, gamma_21= 0.99, gamma_32= 0.99)
+    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0.01, gamma_21= 0.975, gamma_32= 0.975)
 
     spheres = keypoints_to_spheres(keypoints)
 
@@ -42,18 +42,30 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
     escena_tree = o3d.geometry.KDTreeFlann(fpfh_escena)
     objeto_tree = o3d.geometry.KDTreeFlann(fpfh_objeto)
 
-    corr_escena = []
-    corr_objeto = []
+    corr = []
 
-    print(len(fpfh_objeto[:,0]))
+    for i in range(len(fpfh_objeto[0,:])):
 
-    for i in range(len(fpfh_objeto[:,0])):
+        [k, idx_escena, _] = escena_tree.search_knn_vector_xd(fpfh_objeto[:,i], 1)
 
-        corr_objeto = []
+        if not mutua:
+
+            corr.append([i,idx_escena[0]])
+
+        else:
+            
+            [k, idx_objeto, _] = objeto_tree.search_knn_vector_xd(fpfh_escena[:,idx_escena[0]], 1)
+
+            if idx_objeto[0] == i:
+                corr.append([i,idx_escena[0]])
+
+    return o3d.cpu.pybind.utility.Vector2iVector(corr)
 
 
 
-def corresponder():
+
+
+def main():
 
     pcd_objeto = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
 
@@ -99,24 +111,23 @@ def corresponder():
     fpfh_objeto = fpfh_objeto[:, index_array_objeto]
 
 
-    correspondencias(fpfh_escena, fpfh_objeto)
-
+    corr = correspondencias(fpfh_escena, fpfh_objeto)
 
     distance_threshold = 0.005 * 1.5
 
     result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
-        keypoints_objeto, keypoints_escena, pcd_fpfh_objeto, pcd_fpfh_escena, True,
-        distance_threshold,
-        o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
-        6, [],
-                 o3d.pipelines.registration.RANSACConvergenceCriteria(500000, 0.9))
+        keypoints_objeto, keypoints_escena, corr, distance_threshold,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 3,
+        [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
+        o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(distance_threshold)],
+        o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.95))
 
     pcd_objeto.transform(result.transformation)
     pcd_objeto.paint_uniform_color([1, 0, 0])
     o3d.visualization.draw_geometries([pcd_objeto, pcd_escena])
 
 
-def main():
+def main2():
     pcd = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
     # Mostrar nube
     #o3d.visualization.draw_geometries([pcd])
@@ -144,4 +155,4 @@ def main():
 
 
 if __name__ == "__main__":
-    corresponder()
+    main()
