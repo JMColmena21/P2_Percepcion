@@ -1,6 +1,7 @@
 import open3d as o3d
 import numpy as np
 import copy
+import time
 
 CELL_SIZE = 0.0025
 THRESHOLD = 0.0025
@@ -70,25 +71,19 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
 
 def main():
 
-    #pcd_objeto = o3d.io.read_point_cloud("clouds/objects/s0_plc_corr.pcd")
-    #pcd_escena = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
-    
-    #pcd_objeto = o3d.io.read_point_cloud("more_clouds/pepper_obj/pcd_33.pcd")
-    #pcd_escena = o3d.io.read_point_cloud("more_clouds/pepper_scene/pcd_21.pcd")
+    pcd_objeto = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
+    pcd_escena = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
 
-    pcd_objeto = o3d.io.read_point_cloud("more_clouds/pepper_obj/pcd_33.pcd")
-    pcd_escena = o3d.io.read_point_cloud("more_clouds/pepper_scene/pcd_21.pcd")
-
-    '''plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
+    plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
     outlier_cloud = pcd_escena.select_by_index(inliers, invert=True)
 
     plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
     outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
 
     plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.01, ransac_n  = 3, num_iterations = 1000)
-    outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)'''
+    outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)
 
-    pcd_sub_escena, pcd_fpfh_escena = fpfh(pcd_escena)
+    pcd_sub_escena, pcd_fpfh_escena = fpfh(outlier_cloud)
     pcd_sub_objeto, pcd_fpfh_objeto = fpfh(pcd_objeto)
 
     keypoints_escena = extraer_keypoints(pcd_sub_escena)
@@ -141,34 +136,6 @@ def main():
     pcd_objeto.transform(result_icp.transformation)
     pcd_objeto.paint_uniform_color([1, 0, 0])
     o3d.visualization.draw_geometries([pcd_objeto, pcd_escena])
-
-
-def main2():
-    pcd = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
-    # Mostrar nube
-    #o3d.visualization.draw_geometries([pcd])
-
-    plane_model, inliers = pcd.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
-    outlier_cloud = pcd.select_by_index(inliers, invert=True)
-
-    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
-    outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
-
-    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.005, ransac_n  = 3, num_iterations = 1000)
-    outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)
-
-    outlier_cloud_sub = outlier_cloud.voxel_down_sample(0.005) # Tamaño de la hoja de 0.1
-
-    #o3d.visualization.draw_geometries([outlier_cloud_sub])
-
-    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(outlier_cloud_sub, salient_radius= 0.015, non_max_radius = 0.01, gamma_21= 0.975, gamma_32= 0.975)
-
-    spheres = keypoints_to_spheres(keypoints, radius=0.002)
-
-    o3d.visualization.draw_geometries([outlier_cloud_sub, spheres])
-
-    pcd = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
-
 
 if __name__ == "__main__":
     main()
