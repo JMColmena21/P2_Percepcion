@@ -71,16 +71,16 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
 
 def main():
 
-    pcd_objeto = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
-    pcd_escena = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
+    pcd_objeto = o3d.io.read_point_cloud("more_clouds/charmander_obj/pcd_9.pcd")
+    pcd_escena = o3d.io.read_point_cloud("more_clouds/clutter_scene/pcd_26.pcd")
 
-    plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
+    plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 100)
     outlier_cloud = pcd_escena.select_by_index(inliers, invert=True)
 
-    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 1000)
+    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.12, ransac_n  = 3, num_iterations = 100)
     outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
 
-    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.01, ransac_n  = 3, num_iterations = 1000)
+    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.01, ransac_n  = 3, num_iterations = 100)
     outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)
 
     pcd_sub_escena, pcd_fpfh_escena = fpfh(outlier_cloud)
