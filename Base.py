@@ -25,7 +25,7 @@ def fpfh(pcd):
     radius_normal = CELL_SIZE * 4
     pcd_sub.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn = 30))
 
-    radius_feature = CELL_SIZE * 10
+    radius_feature = CELL_SIZE * 8
     pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 100))
 
     return pcd_sub, pcd_fpfh
@@ -34,7 +34,7 @@ def fpfh(pcd):
 def extraer_keypoints(pcd):
 
     keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0.0075, gamma_21= 0.975, gamma_32= 0.975)
-
+    #keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0.01, gamma_21= 0.975, gamma_32= 0.975)
     spheres = keypoints_to_spheres(keypoints)
 
     o3d.visualization.draw_geometries([pcd, spheres])
@@ -126,6 +126,7 @@ def main():
         o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 4,
         [o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(distance_threshold)],
         o3d.pipelines.registration.RANSACConvergenceCriteria(5000, 0.999))
+        #o3d.pipelines.registration.RANSACConvergenceCriteria(20000, 0.999))
     fin_RANSAC = time.time()
 
     evaluation = o3d.pipelines.registration.evaluate_registration(pcd_sub_objeto, pcd_sub_escena, THRESHOLD, result.transformation)

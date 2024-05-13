@@ -127,11 +127,14 @@ def main():
 
     evaluation = o3d.pipelines.registration.evaluate_registration(pcd_sub_objeto, pcd_sub_escena, THRESHOLD, result.transformation)
 
-    print(f"Solo RANSAC: fitness-{evaluation.fitness} rmse-{evaluation.inlier_rmse}")
-
+    inicio_ICP = time.time()
     result_icp = o3d.pipelines.registration.registration_icp(pcd_sub_objeto, pcd_sub_escena, THRESHOLD, result.transformation, o3d.pipelines.registration.TransformationEstimationPointToPoint(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=30))
+    fin_ICP = time.time()
 
-    print(f"ICP: fitness-{result_icp.fitness} rmse-{result_icp.inlier_rmse}")
+    print(f"(Keypoints - {round(fin_keypoints-inicio_keypoints,4)})")
+    print(f"(Correspondencias - {round(fin_correspondencias-inicio_correspondecias,4)})")
+    print(f"(RANSAC - {round(fin_RANSAC-inicio_RANSAC,4)}) Fitness:{evaluation.fitness} RMSE:{evaluation.inlier_rmse}")
+    print(f"(ICP - {round(fin_ICP-inicio_ICP,4)}) Fitness:{result_icp.fitness} RMSE:{result_icp.inlier_rmse}")
 
     pcd_objeto.transform(result_icp.transformation)
     pcd_objeto.paint_uniform_color([1, 0, 0])
