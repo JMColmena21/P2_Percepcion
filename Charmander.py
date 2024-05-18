@@ -6,7 +6,7 @@ import time
 CELL_SIZE = 0.0025
 THRESHOLD = 0.0025
 
-def keypoints_to_spheres(keypoints, radius= 0.001):
+def keypoints_to_spheres(keypoints, radius= 0.004):
     spheres = o3d.geometry.TriangleMesh()
 
     for keypoint in keypoints.points:
@@ -26,14 +26,14 @@ def fpfh(pcd):
     pcd_sub.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn = 30))
 
     radius_feature = CELL_SIZE * 10
-    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 100))
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 300))
 
     return pcd_sub, pcd_fpfh
 
 
 def extraer_keypoints(pcd):
 
-    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.0075, non_max_radius = 0.005, gamma_21= 0.975, gamma_32= 0.975)
+    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.02, non_max_radius = 0.02, gamma_21= 0.9, gamma_32= 0.9)
 
     spheres = keypoints_to_spheres(keypoints)
 
@@ -77,11 +77,12 @@ def main():
     plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 100)
     outlier_cloud = pcd_escena.select_by_index(inliers, invert=True)
 
-    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.12, ransac_n  = 3, num_iterations = 100)
-    outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
+    '''plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.01, ransac_n  = 3, num_iterations = 100)
+    outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)'''
 
-    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.01, ransac_n  = 3, num_iterations = 100)
-    outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)
+    pcd_objeto = pcd_objeto.crop(o3d.geometry.AxisAlignedBoundingBox(np.array([-2,-2,0],dtype=np.float64), np.array([2,2,1.5],dtype=np.float64)))
+
+    inicio_keypoints = time.time()
 
     pcd_sub_escena, pcd_fpfh_escena = fpfh(outlier_cloud)
     pcd_sub_objeto, pcd_fpfh_objeto = fpfh(pcd_objeto)
@@ -109,21 +110,31 @@ def main():
     fpfh_escena = pcd_fpfh_escena.data
     fpfh_objeto = pcd_fpfh_objeto.data
 
-
     fpfh_escena = fpfh_escena[:, index_array_escena]
     fpfh_objeto = fpfh_objeto[:, index_array_objeto]
+    fin_keypoints = time.time()
 
 
+    inicio_correspondecias = time.time()
     corr = correspondencias(fpfh_escena, fpfh_objeto)
+    fin_correspondencias = time.time()
+    
+    line_set = o3d.geometry.LineSet.create_from_point_cloud_correspondences(keypoints_objeto, keypoints_escena, corr)
+    line_set.paint_uniform_color([1, 0, 0])
 
-    distance_threshold = CELL_SIZE * 1.5
+    o3d.visualization.draw_geometries([pcd_sub_objeto, pcd_sub_escena, line_set])
+
+
+    inicio_RANSAC = time.time()
+    distance_threshold = CELL_SIZE * 2
 
     result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
         keypoints_objeto, keypoints_escena, corr, distance_threshold,
-        o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 4,
-        [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
-        o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(distance_threshold)],
-        o3d.pipelines.registration.RANSACConvergenceCriteria(100000, 0.999))
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 3,
+        [o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(distance_threshold)],
+        o3d.pipelines.registration.RANSACConvergenceCriteria(10000, 0.99))
+    fin_RANSAC = time.time()
+
 
     evaluation = o3d.pipelines.registration.evaluate_registration(pcd_sub_objeto, pcd_sub_escena, THRESHOLD, result.transformation)
 
@@ -136,7 +147,7 @@ def main():
     print(f"(RANSAC - {round(fin_RANSAC-inicio_RANSAC,4)}) Fitness:{evaluation.fitness} RMSE:{evaluation.inlier_rmse}")
     print(f"(ICP - {round(fin_ICP-inicio_ICP,4)}) Fitness:{result_icp.fitness} RMSE:{result_icp.inlier_rmse}")
 
-    pcd_objeto.transform(result_icp.transformation)
+    pcd_objeto.transform(result.transformation)
     pcd_objeto.paint_uniform_color([1, 0, 0])
     o3d.visualization.draw_geometries([pcd_objeto, pcd_escena])
 

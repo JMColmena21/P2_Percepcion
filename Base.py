@@ -25,16 +25,16 @@ def fpfh(pcd):
     radius_normal = CELL_SIZE * 4
     pcd_sub.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn = 30))
 
-    radius_feature = CELL_SIZE * 8
-    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 100))
+    radius_feature = CELL_SIZE * 6
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 300))
 
     return pcd_sub, pcd_fpfh
 
 
 def extraer_keypoints(pcd):
 
-    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0.0075, gamma_21= 0.975, gamma_32= 0.975)
-    #keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0.01, gamma_21= 0.975, gamma_32= 0.975)
+    #keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0, gamma_21= 0.7, gamma_32= 0.7)
+    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0.01, gamma_21= 0.9, gamma_32= 0.9)
     spheres = keypoints_to_spheres(keypoints)
 
     o3d.visualization.draw_geometries([pcd, spheres])
@@ -71,16 +71,16 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
 
 def main():
 
-    pcd_objeto = o3d.io.read_point_cloud("clouds/objects/s0_plc_corr.pcd")
+    pcd_objeto = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
     pcd_escena = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
 
-    plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 100)
+    plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 200)
     outlier_cloud = pcd_escena.select_by_index(inliers, invert=True)
 
-    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 100)
+    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 200)
     outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
 
-    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.02, ransac_n  = 3, num_iterations = 100)
+    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.02, ransac_n  = 3, num_iterations = 200)
     outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)
 
     inicio_keypoints = time.time()
@@ -90,36 +90,42 @@ def main():
     keypoints_escena = extraer_keypoints(pcd_sub_escena)
     keypoints_objeto = extraer_keypoints(pcd_sub_objeto)
     
-    pcd_sub_escena_tree = o3d.geometry.KDTreeFlann(pcd_sub_escena)
     index_array_escena = []
 
     for point in keypoints_escena.points:
 
-        [k, idx, _] = pcd_sub_escena_tree.search_knn_vector_3d(point, 1)
-        index_array_escena.append(idx[0])
+        index_array_escena.append(np.where(np.all(np.asarray(pcd_sub_escena.points)==point, axis=1))[0][0])
 
-    pcd_sub_objeto_tree = o3d.geometry.KDTreeFlann(pcd_sub_objeto)
     index_array_objeto = []
 
     for point in keypoints_objeto.points:
 
-        [k, idx, _] = pcd_sub_objeto_tree.search_knn_vector_3d(point, 1)
-        index_array_objeto.append(idx[0])
-    
+        index_array_objeto.append(np.where(np.all(np.asarray(pcd_sub_objeto.points)==point, axis=1))[0][0])
 
     fpfh_escena = pcd_fpfh_escena.data
     fpfh_objeto = pcd_fpfh_objeto.data
 
     fpfh_escena = fpfh_escena[:, index_array_escena]
+
     fpfh_objeto = fpfh_objeto[:, index_array_objeto]
     fin_keypoints = time.time()
+    
+    print(len(keypoints_objeto.points))
+    print(len(keypoints_escena.points))
 
     inicio_correspondecias = time.time()
     corr = correspondencias(fpfh_escena, fpfh_objeto)
     fin_correspondencias = time.time()
 
+
+    line_set = o3d.geometry.LineSet.create_from_point_cloud_correspondences(keypoints_objeto, keypoints_escena, corr)
+    line_set.paint_uniform_color([1, 0, 0])
+
+    o3d.visualization.draw_geometries([pcd_sub_objeto, pcd_sub_escena, line_set])
+
+
     inicio_RANSAC = time.time()
-    distance_threshold = CELL_SIZE * 2
+    distance_threshold = CELL_SIZE * 1.5
 
     result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
         keypoints_objeto, keypoints_escena, corr, distance_threshold,
