@@ -20,10 +20,10 @@ def keypoints_to_spheres(keypoints, radius= 0.002):
 
 def fpfh(pcd_sub):
 
-    radius_normal = CELL_SIZE * 4
+    radius_normal = 0.01
     pcd_sub.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn = 30))
 
-    radius_feature = CELL_SIZE * 6
+    radius_feature = 0.02
     pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 300))
 
     return pcd_fpfh
@@ -31,11 +31,11 @@ def fpfh(pcd_sub):
 
 def extraer_keypoints(pcd):
 
-    #keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0, gamma_21= 0.7, gamma_32= 0.7)
+    #keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.005, non_max_radius = 0.015, gamma_21= 0.9, gamma_32= 0.9)
     keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.01, non_max_radius = 0.01, gamma_21= 0.9, gamma_32= 0.9)
     spheres = keypoints_to_spheres(keypoints)
 
-    o3d.visualization.draw_geometries([pcd, spheres])
+    #o3d.visualization.draw_geometries([pcd, spheres])
 
     return keypoints
 
@@ -48,18 +48,19 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
 
     for i in range(len(fpfh_objeto[0,:])):
 
-        [k, idx_escena, _] = escena_tree.search_knn_vector_xd(fpfh_objeto[:,i], 1)
+        [k, idx_escena, distance_kdtree] = escena_tree.search_knn_vector_xd(fpfh_objeto[:,i], 1)
+        
+        if distance_kdtree[0] < 2000:
+            if not mutua:
 
-        if not mutua:
-
-            corr.append([i,idx_escena[0]])
-
-        else:
-            
-            [k, idx_objeto, _] = objeto_tree.search_knn_vector_xd(fpfh_escena[:,idx_escena[0]], 1)
-
-            if idx_objeto[0] == i:
                 corr.append([i,idx_escena[0]])
+
+            else:
+                
+                [k, idx_objeto, _] = objeto_tree.search_knn_vector_xd(fpfh_escena[:,idx_escena[0]], 1)
+
+                if idx_objeto[0] == i:
+                    corr.append([i,idx_escena[0]])
 
     return o3d.cpu.pybind.utility.Vector2iVector(corr)
 
@@ -67,23 +68,24 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
 
 
 
-def main():
+def main(pcd_escena, pcd_objeto):
 
-    pcd_objeto = o3d.io.read_point_cloud("clouds/objects/s0_plc_corr.pcd")
-    pcd_escena = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
-
+    #print(len(pcd_escena.points))
     inicio = time.time()
+
     plane_model, inliers = pcd_escena.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 200)
     outlier_cloud = pcd_escena.select_by_index(inliers, invert=True)
 
     plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.05, ransac_n  = 3, num_iterations = 200)
     outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
 
-    plane_model, inliers3 = outlier_cloud.segment_plane(distance_threshold = 0.02, ransac_n  = 3, num_iterations = 200)
-    outlier_cloud = outlier_cloud.select_by_index(inliers3, invert=True)
+    plane_model, inliers = outlier_cloud.segment_plane(distance_threshold = 0.02, ransac_n  = 3, num_iterations = 200)
+    outlier_cloud = outlier_cloud.select_by_index(inliers, invert=True)
 
     pcd_sub_escena = outlier_cloud.voxel_down_sample(CELL_SIZE) 
     pcd_sub_objeto = pcd_objeto.voxel_down_sample(CELL_SIZE) 
+    #print(1-(len(pcd_sub_escena.points)/len(outlier_cloud.points)))
+
 
     inicio_keypoints = time.time()
     pcd_fpfh_escena = fpfh(pcd_sub_escena)
@@ -112,8 +114,8 @@ def main():
     fpfh_objeto = fpfh_objeto[:, index_array_objeto]
     fin_keypoints = time.time()
     
-    print(len(keypoints_objeto.points))
-    print(len(keypoints_escena.points))
+    #print(f"Keypoints Objeto: {len(keypoints_objeto.points)}")
+    #print(f"Keypoints Escena: {len(keypoints_escena.points)}")
 
     inicio_correspondecias = time.time()
     corr = correspondencias(fpfh_escena, fpfh_objeto)
@@ -125,21 +127,34 @@ def main():
 
     o3d.visualization.draw_geometries([pcd_sub_objeto, pcd_sub_escena, line_set])
 
-
     inicio_RANSAC = time.time()
     distance_threshold = CELL_SIZE * 1.5
+
+    '''fpfh_objeto = o3d.pipelines.registration.Feature()
+    fpfh_objeto.data = pcd_fpfh_objeto.data[:, index_array_objeto]
+
+    fpfh_escena = o3d.pipelines.registration.Feature()
+    fpfh_escena.data = pcd_fpfh_escena.data[:, index_array_escena]
+
+    result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
+        keypoints_objeto, keypoints_escena, fpfh_objeto, fpfh_escena, True,
+        distance_threshold,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(False),
+        3, [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
+            o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(distance_threshold)
+        ], o3d.pipelines.registration.RANSACConvergenceCriteria(10000, 0.999))'''
 
     result = o3d.pipelines.registration.registration_ransac_based_on_correspondence(
         keypoints_objeto, keypoints_escena, corr, distance_threshold,
         o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 4,
         [o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(distance_threshold)],
-        o3d.pipelines.registration.RANSACConvergenceCriteria(5000, 0.999))
+        o3d.pipelines.registration.RANSACConvergenceCriteria(5000))
     fin_RANSAC = time.time()
 
     evaluation = o3d.pipelines.registration.evaluate_registration(pcd_sub_objeto, pcd_sub_escena, THRESHOLD, result.transformation)
 
     inicio_ICP = time.time()
-    result_icp = o3d.pipelines.registration.registration_icp(pcd_sub_objeto, pcd_sub_escena, THRESHOLD, result.transformation, o3d.pipelines.registration.TransformationEstimationPointToPoint(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=30))
+    result_icp = o3d.pipelines.registration.registration_icp(pcd_sub_objeto, pcd_sub_escena, THRESHOLD, result.transformation, o3d.pipelines.registration.TransformationEstimationPointToPoint(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=100))
     fin_ICP = time.time()
 
     print(f"(Keypoints - {round(fin_keypoints-inicio_keypoints,4)})")
@@ -153,4 +168,15 @@ def main():
     o3d.visualization.draw_geometries([pcd_objeto, pcd_escena])
 
 if __name__ == "__main__":
-    main()
+
+    pcd_piggy = o3d.io.read_point_cloud("clouds/objects/s0_piggybank_corr.pcd")
+    pcd_plant = o3d.io.read_point_cloud("clouds/objects/s0_plant_corr.pcd")
+    pcd_mug = o3d.io.read_point_cloud("clouds/objects/s0_mug_corr.pcd")
+    pcd_plc = o3d.io.read_point_cloud("clouds/objects/s0_plc_corr.pcd")
+    pcd_escena = o3d.io.read_point_cloud("clouds/scenes/snap_0point.pcd")
+
+
+    main(pcd_escena, pcd_piggy)
+    main(pcd_escena, pcd_plant)
+    main(pcd_escena, pcd_mug)
+    main(pcd_escena, pcd_plc)

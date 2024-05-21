@@ -3,7 +3,7 @@ import numpy as np
 import copy
 import time
 
-CELL_SIZE = 0.005
+CELL_SIZE = 0.01
 THRESHOLD = 0.005
 
 def keypoints_to_spheres(keypoints, radius= 0.01):
@@ -22,18 +22,18 @@ def fpfh(pcd):
 
     pcd_sub = pcd.voxel_down_sample(CELL_SIZE) 
 
-    radius_normal = CELL_SIZE * 3
+    radius_normal = 0.02
     pcd_sub.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=radius_normal, max_nn = 30))
 
-    radius_feature = CELL_SIZE * 4
-    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 200))
+    radius_feature = 0.03
+    pcd_fpfh = o3d.pipelines.registration.compute_fpfh_feature(pcd_sub, o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn = 300))
 
     return pcd_sub, pcd_fpfh
 
 
 def extraer_keypoints(pcd):
 
-    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.025, non_max_radius = 0.03, gamma_21= 0.9, gamma_32= 0.9)
+    keypoints = o3d.geometry.keypoint.compute_iss_keypoints(pcd, salient_radius= 0.04, non_max_radius = 0.04, gamma_21= 0.8, gamma_32= 0.9)
 
     spheres = keypoints_to_spheres(keypoints)
 
@@ -84,21 +84,18 @@ def main():
     keypoints_escena = extraer_keypoints(pcd_sub_escena)
     keypoints_objeto = extraer_keypoints(pcd_sub_objeto)
 
-    pcd_sub_escena_tree = o3d.geometry.KDTreeFlann(pcd_sub_escena)
+    
     index_array_escena = []
 
     for point in keypoints_escena.points:
 
-        [k, idx, _] = pcd_sub_escena_tree.search_knn_vector_3d(point, 1)
-        index_array_escena.append(idx[0])
+        index_array_escena.append(np.where(np.all(np.asarray(pcd_sub_escena.points)==point, axis=1))[0][0])
 
-    pcd_sub_objeto_tree = o3d.geometry.KDTreeFlann(pcd_sub_objeto)
     index_array_objeto = []
 
     for point in keypoints_objeto.points:
 
-        [k, idx, _] = pcd_sub_objeto_tree.search_knn_vector_3d(point, 1)
-        index_array_objeto.append(idx[0])
+        index_array_objeto.append(np.where(np.all(np.asarray(pcd_sub_objeto.points)==point, axis=1))[0][0])
     
 
     fpfh_escena = pcd_fpfh_escena.data
