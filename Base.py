@@ -3,6 +3,13 @@ import numpy as np
 import copy
 import time
 
+# NECESARIO QUE LAS NUBES DE PUNTOS 
+# SE ENCUENTREN EN LA MISMA LOCALIZACION 
+# QUE GITHUB:
+#  
+# https://github.com/JMColmena21/P2_Percepcion
+
+
 # Variables globales
 CELL_SIZE = 0.0025
 THRESHOLD = 0.0025

@@ -68,7 +68,6 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
 
 
 
-
 def main():
 
     pcd_objeto = o3d.io.read_point_cloud("more_clouds/charmander_obj/pcd_9.pcd")

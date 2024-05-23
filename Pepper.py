@@ -115,7 +115,6 @@ def main():
 
     o3d.visualization.draw_geometries([pcd_sub_objeto, pcd_sub_escena, line_set])
 
-
     inicio_RANSAC = time.time()
     distance_threshold = CELL_SIZE * 1.5
 
