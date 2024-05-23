@@ -50,19 +50,19 @@ def correspondencias(fpfh_escena, fpfh_objeto, mutua = True):
 
     for i in range(len(fpfh_objeto[0,:])):
 
-        [k, idx_escena, _] = escena_tree.search_knn_vector_xd(fpfh_objeto[:,i], 1)
+        [k, idx_escena, distance_kdtree] = escena_tree.search_knn_vector_xd(fpfh_objeto[:,i], 1)
 
-        if not mutua:
+        if distance_kdtree[0] < 2000:
+            if not mutua:
 
-            corr.append([i,idx_escena[0]])
-
-        else:
-            
-            [k, idx_objeto, _] = objeto_tree.search_knn_vector_xd(fpfh_escena[:,idx_escena[0]], 1)
-
-            if idx_objeto[0] == i:
                 corr.append([i,idx_escena[0]])
 
+            else:
+                
+                [k, idx_objeto, _] = objeto_tree.search_knn_vector_xd(fpfh_escena[:,idx_escena[0]], 1)
+
+                if idx_objeto[0] == i:
+                    corr.append([i,idx_escena[0]])
     return o3d.cpu.pybind.utility.Vector2iVector(corr)
 
 
